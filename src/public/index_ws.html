@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>METANIT.COM</title>
+<style>
+td {padding:5px;}
+button{margin: 5px;}
+</style>
+</head>
+<body>
+    <p>
+        <button id="indexBtn">Главная</button>
+        <button id="histBtn">История</button>
+    </p>
+    <h2>Задай свой вопрос</h2>
+    <div>
+        <input type="hidden" id="userId" />
+        <p>
+            Ваш текст:<br/>
+            <input id="message" />
+        </p>
+         <p>
+             <button id="askBtn">Спросить</button>
+             <button id="resetBtn">Очистить</button>
+        </p>
+    </div>
+    <table>
+        <thead><tr><th>Имя</th><th>Сообщение</th></tr></thead>
+        <tbody>
+        </tbody>
+    </table>
+    <script>
+        var ws = new WebSocket("ws://localhost:8000/api/v1/ask/stream");
+        ws.onmessage = function(event) {
+            var data = JSON.parse(event.data);
+            console.log(typeof data);
+            // не разобралась, что здесь происходит и почему ответ дважды строка Т_Т
+            if (typeof data === "string") {
+                data = JSON.parse(data);
+                }
+            console.log(data);
+            document.querySelector("tbody").append(row(data));
+        };
+        function sendMessage(message) {
+            // добавление записи в табличку
+            const hist = {"user": "Вы:", "message": message};
+            document.querySelector("tbody").append(row(hist));
+            ws.send(message);
+        }
+
+        // Получение истории
+        async function getHistory() {
+            try {
+                const response = await fetch("/api/v1/get/history", {
+                    method: "GET",
+                    headers: { "Accept": "application/json" }
+                });
+                if (response.ok === true) {
+                    // получаем данные
+                    const hist = await response.json();
+                    console.log(hist);
+                    const rows = document.querySelector("tbody");
+                    // добавляем в таблицу
+                    hist.forEach(h => rows.append(row(h)));
+                } else {
+                    const error = await response.json();
+                    console.log(error.detail);
+                    alert(error.detail);
+                }
+            }
+            catch(err) {
+                console.log(error.message);
+                alert(err.message);
+            }
+        }
+
+        // сброс данных формы
+        function reset() {
+            document.getElementById("userId").value =
+            document.getElementById("message").value = "";
+        }
+        // сброс данных таблицы
+        function resetTable() {
+           const rows = document.querySelector("tbody");
+           document.querySelectorAll("tr").forEach(function(e){e.remove()})
+        }
+        // создание строки для таблицы
+        function row(hist) {
+
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", hist.user);
+
+            const nameTd = document.createElement("td");
+            nameTd.append(hist.user);
+            tr.append(nameTd);
+
+            const ageTd = document.createElement("td");
+            ageTd.append(hist.message);
+            tr.append(ageTd);
+
+            return tr;
+        }
+        // нажатие кнопки сброса, сброс значений формы
+        document.getElementById("resetBtn").addEventListener("click", () =>  reset());
+
+        //
+        document.getElementById("askBtn").addEventListener("click", async () => {
+
+            const id = "user";
+            const mess = document.getElementById("message").value;
+            await sendMessage(mess);
+            reset();
+
+        });
+
+        // нажатие кнопки истории, очистка таблицы и вывод истории
+        document.getElementById("histBtn").addEventListener("click", async () => {
+            resetTable();
+            const id = "user";
+            const mess = document.getElementById("message").value;
+            await getHistory();
+        });
+
+        // нажатие кнопки главная, загрузка начальной страницы
+        document.getElementById("indexBtn").addEventListener("click", async () => {
+            location.reload();
+        });
+
+    </script>
+</body>
+</html>
